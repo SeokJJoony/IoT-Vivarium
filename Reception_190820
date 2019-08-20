@@ -1,0 +1,155 @@
+#include <Servo.h>
+Servo myservo;
+#define WATER_PIN 5             //5번: 물 공급
+#define MIST_PIN 8              //8번: 미스팅
+#define UV_PIN1 10              //10번: UVB램프1
+#define UV_PIN2 11              //11번: UVB램프2
+#define SPOT_PIN 12             //12번: 스팟 램프
+#define FAN_PIN 13              //13번: 팬
+
+int pos = 0;                    //먹이공급기 회전 각도
+char recvd=0;
+char prevrecvd=1;
+char AutoRecvd;
+byte dimming = 0;               //디밍 레벨(0~128) 0:ON  128:OFF
+
+void setup(){
+  Serial.begin(9600);
+  pinMode(UV_PIN1,OUTPUT);
+  pinMode(UV_PIN2,OUTPUT);
+  pinMode(MIST_PIN,OUTPUT);
+  pinMode(SPOT_PIN,OUTPUT);
+  pinMode(FAN_PIN,OUTPUT);
+  pinMode(WATER_PIN,OUTPUT);
+  myservo.attach(9);              //9번: 먹이 공급기
+  attachInterrupt (0, zero_crosss_int, RISING);
+  attachInterrupt (1, Uart_Receive, CHANGE); 
+  digitalWrite (SPOT_PIN,HIGH);
+  digitalWrite(FAN_PIN,LOW);
+  digitalWrite(UV_PIN1,HIGH);
+  digitalWrite(UV_PIN2,HIGH);
+  digitalWrite(MIST_PIN,LOW);
+  digitalWrite(WATER_PIN,LOW); 
+}
+
+void zero_crosss_int()            // 스팟램프의 빛을 희미하게하기 위해 제로 크로싱을 감지
+{
+  int dimtime = (75 * dimming); 
+  delayMicroseconds (dimtime);     
+  digitalWrite (SPOT_PIN,HIGH); 
+  delayMicroseconds (10); 
+  digitalWrite (SPOT_PIN,LOW); 
+}
+
+void Uart_Receive()
+{
+  if(Seiral.available()>0)
+  {
+  recvd = Serial.read(); 
+  }  
+}
+
+void UserControlMode()
+{
+    
+    if(recvd =='U')                //0~1:UVB램프1, 2~3:UVB램프2
+      digitalWrite(UV_PIN1,LOW); 
+    if(recvd =='V')
+      digitalWrite(UV_PIN1,HIGH);
+    if(recvd =='u')
+      digitalWrite(UV_PIN2,LOW);   
+    if(recvd=='v') 
+      digitalWrite(UV_PIN2,HIGH);
+
+    if(recvd =='*')
+     detachInterrupt(0);
+     
+    if(recvd =='(')                 //L(낮음) M(중간) H(높은): 스팟램프조도
+    {
+     attachInterrupt (0, zero_crosss_int, RISING);
+      dimming=75;
+    }
+      
+    if(recvd == ')')
+    {
+      attachInterrupt (0, zero_crosss_int, RISING);
+      dimming=55;
+    }
+    if(recvd == '_')
+    {
+      attachInterrupt (0, zero_crosss_int, RISING);
+      dimming=25;
+    }
+    if(recvd == 'r')               //r:먹이 한번 공급 및 충전(서보모터 초기세팅)
+    {
+           pos=90;
+           myservo.write(pos);
+           delay(10);
+        
+    }
+    if(recvd == 'l')              //l:먹이 2회분 충전(서보모터 왼쪽회전)
+    {
+          pos=10;
+          myservo.write(pos);
+          delay(10);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+    }
+
+    if(recvd == 'R')               //R:먹이 2회분 공급(서보모터 오른쪽회전)    
+    {
+           pos=180;
+           myservo.write(pos);
+           delay(10);
+        
+    } 
+   
+
+    if(recvd == '^')                 //^: 미스팅 시스템 온
+      digitalWrite(MIST_PIN,HIGH);
+    if(recvd == '&')                 //& : 미스팅 시스템 오프
+      digitalWrite(MIST_PIN,LOW);
+
+    if(recvd == '!')                 //S: 팬 구동
+      digitalWrite(FAN_PIN,HIGH);
+    if(recvd == '@')            //F: 팬 멈춤
+      digitalWrite(FAN_PIN,LOW);     
+
+    if(recvd == '#')                 //W: 물 공급 
+      digitalWrite(WATER_PIN,HIGH);
+    if(recvd == '$')            //D: 물 공급 중단
+      digitalWrite(WATER_PIN,LOW);
+}
+
+void AutoControlMode()
+{
+  if(recvd == '[')
+  {
+    detachInterrupt(0);
+    digitalWrite(MIST_PIN,HIGH);
+    digitalWrite(FAN_PIN,LOW);
+  }
+  if(recvd == '{')
+  {
+    attachInterrupt (0, zero_crosss_int, RISING);
+    dimming=55; 
+    digitalWrite(FAN_PIN,LOW);
+    digitalWrite(MIST_PIN,LOW);
+  }
+  if(recvd == ']')
+  {
+    attachInterrupt (0, zero_crosss_int, RISING);
+    dimming=75;
+    digitalWrite(MIST_PIN,LOW);
+    digitalWrite(FAN_PIN,HIGH);
+  }
+  if(recvd == '}')
+  {
+    attachInterrupt (0, zero_crosss_int, RISING);
+    dimming=25;
+  }
+}
+void loop()
+{
+  UserControlMode();
+  AutoControlMode();  
+}

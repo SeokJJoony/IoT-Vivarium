@@ -1,0 +1,317 @@
+#include <MsTimer2.h>
+#include <LiquidCrystal_I2C.h>
+#include <SoftwareSerial.h>
+#include <DHT.h>
+
+#define DHTTYPE DHT11
+#define UVOUT A0
+#define REF_3V3 A1
+#define WATER A2
+#define DOORPIN 4
+#define DHTPIN 5
+#define Moving1 10
+#define Moving2 11
+#define Moving3 12
+#define Moving4 13
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+SoftwareSerial BTSerial(8,9);
+DHT dht(DHTPIN,DHTTYPE);
+
+typedef struct TempComponent{     //온도 센서 구조체
+  int Temp = 0;
+  int TempSum = 0;
+  int TempAvg = 0;  
+}TEMP;
+
+typedef struct HumiComponent{     //습도 센서 구조체
+  int Humi = 0;
+  int HumiSum = 0;
+  int HumiAvg = 0;    
+}HUMI;
+
+typedef struct UvComponent{       //UV 센서 구조체  
+int uvLevel = 0;
+int refLevel = 0;
+float uvIntensity=0.0;  
+}UV;
+
+typedef struct MovingComponent{   //움직임 센서 구조체 
+  int Mov1=0;                
+  int Mov2=0;
+  int Mov3=0;
+  int Mov4=0;
+  unsigned int MovSum=0;
+  unsigned int MovResult = 0;
+  int MovTurn=0;
+  int MovState=2;                  
+}MOV;
+
+int Misttank = 0;
+int Water = 0;
+int doorState=0;
+unsigned int DayCount=0;
+int dateCh = 0;
+int WCharge = 0;
+int i =0;   
+char AppValue=0;
+char PrevAppValue=0;
+char AutoAppValue=0;
+char PrevAutoAppValue=0;
+char data[13]={0,};
+
+TEMP temp;                          //구조체 객체 선언
+HUMI humi;
+UV uv;
+MOV mov;
+
+void setup(){
+  lcd.init();                       //lcd 세팅
+  lcd.backlight();
+  lcd.setCursor(0,0);
+  lcd.print("temp = ");
+  lcd.setCursor(11,0);
+  lcd.print("C");
+  lcd.setCursor(0,1);
+  lcd.print("humd = ");
+  lcd.setCursor(11,1);
+  lcd.print("%");
+  
+  Serial.begin(9600);               //직렬 통신 보드레이트
+  BTSerial.begin(9600);
+
+  MsTimer2::set(3000,Send);
+  MsTimer2::start(); 
+  
+  pinMode(WATER,INPUT);
+  pinMode(UVOUT,INPUT);
+  pinMode(Moving1,INPUT);
+  pinMode(Moving2,INPUT);
+  pinMode(Moving3,INPUT);
+  pinMode(Moving4,INPUT);
+  pinMode(REF_3V3,INPUT);
+  pinMode(DOORPIN, INPUT_PULLUP);
+}
+
+void Send()
+{
+  BTSerial.println(data);
+  DayCount++;
+  temp.TempSum += temp.Temp;
+  humi.HumiSum += humi.Humi;
+  if(DayCount%10==0)
+  {
+     temp.TempSum =0;
+     humi.HumiSum =0;
+  }
+}
+float mapfloat(float x,float in_min,float in_max,float out_min,float out_max)
+{
+    return (x-in_min)*(out_max-out_min) / (in_max - in_min)+out_min;
+}   //UV 수치 계산
+
+int averageAnalogRead(int pinToRead)  //아날로그 값을 8번 측정 후 평균 값 계산
+{
+  byte numberOfReadings = 8;
+  unsigned int runningValue=0;
+  for(int x=0;x<numberOfReadings;x++)
+  {
+    runningValue +=analogRead(pinToRead);
+    return(runningValue);
+  }
+}
+
+void sensorRecv()
+{
+  temp.Temp= dht.readTemperature();
+  humi.Humi= dht.readHumidity();
+  uv.uvLevel = averageAnalogRead(UVOUT);
+  uv.refLevel = averageAnalogRead(REF_3V3); 
+  mov.Mov1 = digitalRead(Moving1);
+  mov.Mov2 = digitalRead(Moving2);
+  mov.Mov3 = digitalRead(Moving3);
+  mov.Mov4 = digitalRead(Moving4);
+  float outputVoltage = 3.3/uv.refLevel*uv.uvLevel;
+  uv.uvIntensity = mapfloat(outputVoltage,0.99,2.9,0.0,15.0);
+  int uvdata1 = (int)(uv.uvIntensity *100)/100;
+  int uvdata2 = (int)(uv.uvIntensity *100)%100;
+  Water=analogRead(WATER);
+  mov.MovSum +=mov.Mov1+mov.Mov2+mov.Mov3+mov.Mov4; 
+ // doorState=digitalRead(DOORPIN);  
+}
+
+void autoMode()
+{
+  while(1)
+  { 
+    sensorRecv();
+   
+    sprintf(data,"%02d%02d%01d%01d%02d%02d%01d%01d",temp.Temp,humi.Humi,doorState,dateCh,temp.TempAvg,humi.HumiAvg,WCharge,mov.MovState);
+   
+    if(mov.MovResult <15000)
+    {
+      mov.MovState=1;
+    }
+  
+    else if(mov.MovResult >=15000)
+    {
+      mov.MovState=2;
+    }
+  
+    if(Water<100)
+    {
+      WCharge=1;
+      AutoAppValue='#';
+    }
+  
+    if(Water>=100)
+    {
+      WCharge=0;
+      AutoAppValue='$';
+    }
+  
+    lcd.setCursor(8,0);
+    lcd.print(temp.Temp);
+    lcd.setCursor(8,1);
+    lcd.print(humi.Humi); 
+     
+    if(DayCount%10==9)
+    {
+      temp.TempAvg = temp.TempSum/9;
+      humi.HumiAvg = humi.HumiSum/9;
+    }
+  
+    else if(DayCount%10==0&&DayCount!=0)
+    {
+      mov.MovTurn++;
+      if(mov.MovTurn ==4)
+      {
+        mov.MovTurn=0;
+        mov.MovResult = mov.MovSum;
+        mov.MovSum=0; 
+      }
+      dateCh=1;
+    }
+   
+    else if(DayCount%10==1)
+    {
+      dateCh=0;   
+    }
+  
+    if(humi.Humi<60)
+    {
+      AutoAppValue='['; 
+    }
+  
+    if(temp.Temp>28 &&humi.Humi>=60)
+    {
+      AutoAppValue=']';   
+    }
+  
+    if(temp.Temp>24&&temp.Temp<=28&&humi.Humi>=70)
+    {
+      AutoAppValue='{'; 
+    }
+  
+    if(temp.Temp<20 &&humi.Humi>=70)
+    { 
+      AutoAppValue=')';
+    }
+  
+    if(BTSerial.available()>0)
+    { 
+      AutoAppValue= BTSerial.read();
+    }
+  
+    if(AutoAppValue != PrevAutoAppValue)
+    {
+      if(AutoAppValue>=0&&AutoAppValue<=127)
+      {
+        Serial.println(AutoAppValue);
+        PrevAutoAppValue=AutoAppValue;
+      }
+    }   
+   
+    if(AutoAppValue == 'Z')
+    {
+      AppValue = 0;
+      break;
+    }
+  } 
+}
+
+void loop()
+{
+  sensorRecv();
+  
+  if(mov.MovResult <15000)
+  {
+    mov.MovState=1;
+  }
+  
+  if(mov.MovResult >=15000)
+  {
+    mov.MovState=2;
+  }
+  
+  if(Water<60)
+  {
+    WCharge=1;
+  }
+  
+  if(Water>=60)
+  {
+    WCharge=0;
+  }
+  
+  sprintf(data,"%02d%02d%01d%01d%02d%02d%01d%01d",temp.Temp,humi.Humi,doorState,dateCh,temp.TempAvg,humi.HumiAvg,WCharge,mov.MovState);
+    //데이터 스트림
+  
+  lcd.setCursor(8,0);
+  lcd.print(temp.Temp);
+  lcd.setCursor(8,1);
+  lcd.print(humi.Humi);
+   
+  if(BTSerial.available()>0)
+  { 
+    AppValue= BTSerial.read();
+  }
+  
+  if(AppValue != PrevAppValue)
+  {
+    if(AppValue>=0&&AppValue<=127)
+    {
+    Serial.println(AppValue);
+    PrevAppValue=AppValue;
+    }
+  }
+  
+  if(DayCount%10==9)
+  {
+    temp.TempAvg = temp.TempSum/9;
+    humi.HumiAvg = humi.HumiSum/9;
+  }
+  
+  else if(DayCount%10==0&&DayCount!=0)
+  {
+    mov.MovTurn++;
+    if(mov.MovTurn ==4)
+    {
+    mov.MovTurn=0;
+    mov.MovResult = mov.MovSum;
+    mov.MovSum=0; 
+    }
+    dateCh=1;
+  }
+  
+  else if(DayCount%10==1)
+  {
+    dateCh=0;   
+  }
+
+  if(AppValue == 'K')
+  {
+    autoMode();  
+  }
+  }
+  
