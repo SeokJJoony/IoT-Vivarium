@@ -1,0 +1,29 @@
+*Zero crossing에 대한 공부
+상용전원 220AC 60Hz 에서 전압 영점은 120번 존재(Sin1hz 에서 영점이 2개 존재하므로)
+이때 0V를 지나는 영점에서 신호를 전송하는 것을 Zero crossing 이라고 함
+
+교류신호에서 0이되는 지점을 카운팅함으로써 주파수를 세는 것이 가능하고
+이것을 기반으로 AC 신호를 제어할 수 있음.
+
+램프의 밝기(전력)을 제어해야하는데 제로크로싱을 이용해 전압의 급격한 감소를
+막을 수 있음(급격한 감소가 일어나면 램프에 많은 열에너지 방출-탈 수가 있음)
+
+결국 PWM신호(위상) 제어가 가능해짐 (http://blog.daum.net/tangleguy/18221849)
+0점인 지점에서 falling edge와 rising edge가 발생하여 PWM제어가가능함
+아래는 제로크로싱 함수
+void zero_crosss_int()            
+{
+    int dimtime = (75 * dimming); 
+    delayMicroseconds (dimtime);     
+    digitalWrite (SPOT_PIN,HIGH); 
+    delayMicroseconds (10); 
+    digitalWrite (SPOT_PIN,LOW); 
+}
+
+dimming변수는 디밍의 정도 값을 나타냄
+디밍 정도에따라 딜레이가 길어짐 
+ON/OFF 는 외부인터럽트 활성화 / 비활성화 구문으로 제어
+attachInterrupt (0, zero_crosss_int, RISING); 
+detachInterrupt(0);
+이때 0은 인터럽테 벡터(핀번호가아님 - 우노에서는 인터럽트0번이 2번핀)
+
