@@ -1,0 +1,31 @@
+#include <FreeRTOS_AVR.h> //라이브러리 불러오기
+#include <basic_io_avr.h>
+
+
+void setup() {
+  Serial.begin(9600);
+
+  xTaskCreate(t1_Main, NULL, configMINIMAL_STACK_SIZE, NULL, 1, NULL); //테스크1,우선순위1
+  xTaskCreate(t2_Main, NULL, configMINIMAL_STACK_SIZE, NULL, 1, NULL); //테스크2,우선순위1
+
+  vTaskStartScheduler(); //OS동작 시작
+
+  while(1);
+}
+
+void t1_Main(void *arg){ //테스크1 함수
+  while(1) {
+    vPrintString("A \n"); //시러얼프린트랑 동일
+  }
+}
+
+void t2_Main(void *arg){ //테스크2 함수
+  while(1) {
+    vPrintString(" B\n"); //시리얼프린트랑 동일
+  }
+}
+
+void loop() {
+  //사용안함
+}
+
