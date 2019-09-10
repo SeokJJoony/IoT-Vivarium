@@ -23,7 +23,7 @@ FreeRTOS 라이브러리 함수들
    ex)  xTaskCreate(t1_Main, NULL, configMINIMAL_STACK_SIZE, NULL, 1, NULL);
    taskFunction : t1t1_Main
    테스크이름 : NULL
-   사용할 스택크기 : configMINIMAL_STACK_SIZE
+   사용할 스택크기 : configMINIMAL_STACK_SIZE (사용할 스택의 크기가 너무 작으면 프로그램이 멈춤!!) 
    함수 실행 시 넘겨줄 인자 :NULL
    테스크 우선 순위 : 1(숫자가 높을 수록 높은 순위)
    테스크 핸들 : NULL
@@ -31,7 +31,27 @@ FreeRTOS 라이브러리 함수들
 2) xTaskStartScheduler() : 운영체제 동작 시작
 3) vPrintSring() : Serial.print와 동일
 4) vTaskDelay() : 쓰레드에서 딜레이함수 (기존 딜레이시 다른 동작이 불가능했던 것에 비해 동시동작이가능) 		
+ -> vTaskDelay 함수와 vTaskDelayUntil의 차이점 : 예를들어 Led 구동시간이 0.5초라고하면 코드에서
+ 
+     LedTask();  //구동시간 0.5초
+     vTaskDelay(1000/portTICK_PERIOD_MS);  //1초 딜레이
+     
+ -> vTaskDelay를 사용하면 1.5초마다 led가 점등 됨, 반면에
+ 
+     LedTask();  //구동시간 0.5초
+     vTaskDelayUntil(&xLastWakeTime, 1000/portTICK_PERIOD_MS);
+     
+ -> vTaskDelayUntil을 사용하면 1.5초가아니라 1초마다 Led를 점등시킬 수 있음
+ 
+ (freeRTOS의 딜레이 함수를 사용하면 딜레이되는 순간에도 다른 태스크가 동작할 수 있다는 점이 굉장히 흥미로움, 졸업작품을 개발하면서
+  7개의 센서의 데이터를 읽어 어플에 보내주고 슬레이브 아두이노로 명령을 해야하는데 타이밍 제어가 쉽지않아 어플이 터지는 문제점이 발생했음.
+  루프를 세개로 나눠 첫번째 루프는 슬레이브에 명령(어플로부터 데이터 수신), 두번째는 어플에 데이터 전송, 세번째는 센서값 읽기로 구성하고자함.
+  우선순위는 모두 같고, 의문점이 전역변수를 선언하여 두 태스크가 공유하도록 해야하는데 아직 세마포어에 대한 이해가 부족하여 세마포어 핸들러로
+  태스크의 데이터 사용을 제어해야하는지 안해도 되는지 모르겠음. 빠른시일안에 공부할 예정)
+  
+ 
 
+ 
 
 
  
