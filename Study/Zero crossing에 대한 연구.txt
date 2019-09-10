@@ -1,16 +1,16 @@
-*Zero crossing�� ���� ����
-������� 220AC 60Hz ���� ���� ������ 120�� ����(Sin1hz ���� ������ 2�� �����ϹǷ�)
-�̶� 0V�� ������ �������� ��ȣ�� �����ϴ� ���� Zero crossing �̶�� ��
+*Zero crossing에 대한 공부
+상용전원 220AC 60Hz 에서 전압 영점은 120번 존재(Sin1hz 에서 영점이 2개 존재하므로)
+이때 0V를 지나는 영점에서 신호를 전송하는 것을 Zero crossing 이라고 함
 
-������ȣ���� 0�̵Ǵ� ������ ī���������ν� ���ļ��� ���� ���� �����ϰ�
-�̰��� ������� AC ��ȣ�� ������ �� ����.
+교류신호에서 0이되는 지점을 카운팅함으로써 주파수를 세는 것이 가능하고
+이것을 기반으로 AC 신호를 제어할 수 있음.
 
-������ ���(����)�� �����ؾ��ϴµ� ����ũ�ν��� �̿��� ������ �ް��� ���Ҹ�
-���� �� ����(�ް��� ���Ұ� �Ͼ�� ������ ���� �������� ����-Ż ���� ����)
+램프의 밝기(전력)을 제어해야하는데 제로크로싱을 이용해 전압의 급격한 감소를
+막을 수 있음(급격한 감소가 일어나면 램프에 많은 열에너지 방출-탈 수가 있음)
 
-�ᱹ PWM��ȣ(����) ��� �������� (http://blog.daum.net/tangleguy/18221849)
-0���� �������� falling edge�� rising edge�� �߻��Ͽ� PWM���������
-�Ʒ��� ����ũ�ν� �Լ�
+결국 PWM신호(위상) 제어가 가능해짐 (http://blog.daum.net/tangleguy/18221849)
+0점인 지점에서 falling edge와 rising edge가 발생하여 PWM제어가가능함
+아래는 제로크로싱 함수
 void zero_crosss_int()            
 {
     int dimtime = (75 * dimming); 
@@ -20,10 +20,13 @@ void zero_crosss_int()
     digitalWrite (SPOT_PIN,LOW); 
 }
 
-dimming������ ����� ���� ���� ��Ÿ��
-��� ���������� �����̰� ����� 
-ON/OFF �� �ܺ����ͷ�Ʈ Ȱ��ȭ / ��Ȱ��ȭ �������� ����
+dimming변수는 디밍의 정도 값을 나타냄
+디밍 정도에따라 딜레이가 길어짐 
+ON/OFF 는 외부인터럽트 활성화 / 비활성화 구문으로 제어
 attachInterrupt (0, zero_crosss_int, RISING); 
 detachInterrupt(0);
-�̶� 0�� ���ͷ��� ����(�ɹ�ȣ���ƴ� - ��뿡���� ���ͷ�Ʈ0���� 2����)
+이때 0은 인터럽테 벡터(핀번호가아님 - 우노에서는 인터럽트0번이 2번핀)
 
+(Zero crossing 함수를 딜레이로 타이밍 제어를 했는데 이거 때문인지? 아니면 외부인터럽트의 딜레이 때문인지 조광기로 램프의 세기를 조절하는데
+ 딜레이가 존재, 엄청 스트레스 ;;; 작은 밝기에서 큰 밝기로 변경에서 딜레이가 큼 마이크로초딜레이라 크게 걱정할 필요 없을 줄 알았는데...
+ millis() 함수나 타이머 카운터 인터럽트로 다른동작이 밀리는 걸 방지하거나 freeRTOS 다중 쓰레드 공부가 되면 vTaskDelay를 사용하려고 함)
