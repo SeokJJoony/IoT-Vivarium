@@ -1,0 +1,137 @@
+#include <FreeRTOS_AVR.h>
+#include <SoftwareSerial.h>
+#include <DHT.h>
+
+#define DHTTYPE DHT22  
+#define DHTPIN 5
+#define MS(x) (((unsigned long)(x)*configTICK_RATE_HZ)/1000L)
+
+SoftwareSerial BTSerial(8, 9);
+DHT dht(DHTPIN, DHTTYPE);
+
+SemaphoreHandle_t sem;
+
+typedef struct TempComponent {     //온도 센서 구조체
+	int Temp = 0;
+	int TempSum = 0;
+	int TempAvg = 0;
+}TEMP;
+
+typedef struct HumiComponent {     //습도 센서 구조체
+	int Humi = 0;
+	int HumiSum = 0;
+	int HumiAvg = 0;
+}HUMI;
+
+typedef struct MovingComponent {   //움직임 센서 구조체 
+	int Mov1 = 0;
+	int Mov2 = 0;
+	int Mov3 = 0;
+	int Mov4 = 0;
+	unsigned int MovSum = 0;
+	unsigned int MovResult = 0;
+	int MovTurn = 0;
+	int MovState = 2;
+}MOV;
+
+unsigned int DayCount = 0;
+unsigned long currentMillis = 0;
+unsigned long previousMillis = 0;
+int MillisCount = 0;
+int Misttank = 0;
+int Water = 0;
+int doorState = 0;
+int i = 0;
+int dateCh = 0;
+int WCharge = 0;
+char AppValue = 0;
+char PrevAppValue = 0;
+char AutoAppValue = 0;
+char PrevAutoAppValue = 0;
+char data[13] = { 0, };
+
+TEMP temp;                          //구조체 객체 선언
+HUMI humi;
+MOV mov;
+
+static void TempSensor(void *arg)
+{
+	while (1)
+	{
+		/*currentMillis = millis();
+		if (currentMillis - previousMillis >= 1000)
+		{
+			MillisCount++;
+			previousMillis = currentMillis;
+		}*/
+		temp.Temp = dht.readTemperature();
+		humi.Humi = dht.readHumidity();
+		vTaskDelay(MS(1000));
+		
+	}
+
+}
+
+static void BtSend(void *arg)
+{
+	while (1)
+	{
+		
+		
+		sprintf(data,"%02d%02d%01d%01d%02d%02d%01d%01d", temp.Temp, humi.Humi, doorState, dateCh, temp.TempAvg, humi.HumiAvg, WCharge, mov.MovState);
+		if (BTSerial.available() > 0)
+		{
+			BTSerial.println(data);BTSerial.println(data);
+		}
+		vTaskDelay(MS(3000));
+		DayCount++;
+		temp.TempSum += temp.Temp;
+		humi.HumiSum += humi.Humi;
+		if (DayCount % 10 == 0)
+		{
+			temp.TempSum = 0;
+			humi.HumiSum = 0;
+		}
+	}
+}
+
+static void SrSend(void *arg)
+{
+	while (1)
+	{
+		if (BTSerial.available()>0)            //앱에서 아두이노로 데이터 전송
+		{
+			AppValue = BTSerial.read();
+		}
+
+		if (AppValue != PrevAppValue)          //앱에서온 데이터 값이 전에 온 값이랑 동일하면 받지않음
+		{
+			if (AppValue >= 0 && AppValue <= 127)
+			{
+				Serial.println(AppValue);
+				PrevAppValue = AppValue;
+			}
+		}
+	}
+}
+
+void setup()
+{
+	portBASE_TYPE s1, s2, s3;
+
+	Serial.begin(9600);               //직렬 통신 보드레이트
+	BTSerial.begin(9600);
+
+	s1 = xTaskCreate(TempSensor, NULL, 200, NULL, 1, NULL);
+	s2 = xTaskCreate(BtSend, NULL, 200, NULL, 1, NULL);
+	s3 = xTaskCreate(SrSend, NULL, 200, NULL, 1, NULL);
+
+	vTaskStartScheduler();
+
+	while (1);
+}
+
+void loop()		//사용 x
+{
+
+}
