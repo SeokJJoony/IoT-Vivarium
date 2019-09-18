@@ -21,7 +21,7 @@ FreeRTOS 라이브러리 함수들
 1) xTaskCreate() : 각각의 task를 만드는 함수
 -> xTaskCreate(taskFunction, 테스크이름, 사용할 스택크기, 함수 실행 시 넘겨줄 인자,테스크 우선 순위,테스크 핸들)
    ex)  xTaskCreate(t1_Main, NULL, configMINIMAL_STACK_SIZE, NULL, 1, NULL);
-   taskFunction : t1t1_Main
+   taskFunction : t1_Main
    테스크이름 : NULL
    사용할 스택크기 : configMINIMAL_STACK_SIZE (사용할 스택의 크기가 너무 작으면 프로그램이 멈춤!!) 
    함수 실행 시 넘겨줄 인자 :NULL
