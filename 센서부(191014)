@@ -131,7 +131,7 @@ void Receive()
     AppValue= BTSerial.read();
   }
   
-  if(AppValue != PrevAppValue || PrevAppValue == 'e')          //앱에서온 데이터 값이 전에 온 값이랑 동일하면 받지않음
+  if(AppValue != PrevAppValue)          //앱에서온 데이터 값이 전에 온 값이랑 동일하면 받지않음
   {
     if(AppValue>=0&&AppValue<=127)
     {
@@ -206,7 +206,6 @@ void sensorRecv()                           //센서값 측정하는 함수
   int uvdata1 = (int)(uv.uvIntensity *100)/100;
   int uvdata2 = (int)(uv.uvIntensity *100)%100;
   Water=analogRead(WATER);
-  
   doorState=digitalRead(DOORPIN);  
 }
 
