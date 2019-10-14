@@ -1,0 +1,176 @@
+#include <Servo.h>             //서보모터 라이브러리
+#include <SoftwareSerial.h>    
+SoftwareSerial RecvSerial(3,6); 
+Servo myservo;
+#define WATER_PIN 7             //5번: 물 공급
+#define MIST_PIN 8              //8번: 미스팅
+#define UV_PIN1 10              //10번: UVB램프1
+#define UV_PIN2 11              //11번: UVB램프2
+#define SPOT_PIN 12             //12번: 스팟 램프
+#define FAN_PIN 13              //13번: 팬
+
+unsigned long WaterMillis = 0;
+int pos = 0;                    //먹이공급기 회전 각도
+char recvd=0;
+char prevrecvd='0';
+char command = 0;
+char AutoRecvd;
+byte dimming = 0;               //디밍 레벨(0~128) 0:ON  128:OFF
+
+void setup(){
+  Serial.begin(9600);
+  RecvSerial.begin(9600);
+  pinMode(UV_PIN1,OUTPUT);
+  pinMode(UV_PIN2,OUTPUT);
+  pinMode(MIST_PIN,OUTPUT);
+  pinMode(SPOT_PIN,OUTPUT);
+  pinMode(FAN_PIN,OUTPUT);
+  pinMode(WATER_PIN,OUTPUT);
+  myservo.attach(5);              //9번: 먹이 공급기
+  attachInterrupt (0, zero_crosss_int, RISING);       
+  attachInterrupt (1, Uart_Receive, RISING);          //수신 인터럽트
+  digitalWrite (SPOT_PIN,HIGH);
+  digitalWrite(FAN_PIN,LOW);
+  digitalWrite(UV_PIN1,HIGH);
+  digitalWrite(UV_PIN2,HIGH);
+  digitalWrite(MIST_PIN,LOW);
+  digitalWrite(WATER_PIN,LOW); 
+}
+
+void zero_crosss_int()            // 스팟램프의 빛을 희미하게하기 위해 제로 크로싱을 감지
+{
+  int dimtime = (75 * dimming); 
+  delayMicroseconds (dimtime);     
+  digitalWrite (SPOT_PIN,HIGH); 
+  delayMicroseconds (10); 
+  digitalWrite (SPOT_PIN,LOW); 
+}
+
+void Uart_Receive()                //데이터 수신 함수
+{
+  if(RecvSerial.available()>0)
+  {  
+  recvd = RecvSerial.read();
+  }  
+}
+
+void UserControlMode()          //수동사육모드시 명령어
+{
+    unsigned long CurrentMillis = 0;
+    if(recvd =='U')                //U:UVB램프1 ON V:UVB램프1 OFF, u:UVB램프2 ON v:UVB램프2 OFF
+      digitalWrite(UV_PIN1,LOW); 
+    if(recvd =='V')
+      digitalWrite(UV_PIN1,HIGH);
+    if(recvd =='u')
+      digitalWrite(UV_PIN2,LOW);   
+    if(recvd=='v') 
+      digitalWrite(UV_PIN2,HIGH);
+
+    if(recvd =='*')                //*:OFF (:저온 ):중온 _:고온  (스팟램프조도)
+     detachInterrupt(0);
+     
+    if(recvd =='(')                 
+    {
+     attachInterrupt (0, zero_crosss_int, RISING);
+      dimming=75;
+    }
+      
+    if(recvd == ')')
+    {
+      attachInterrupt (0, zero_crosss_int, RISING);
+      dimming=55;
+    }
+    if(recvd == '_')
+    {
+      attachInterrupt (0, zero_crosss_int, RISING);
+      dimming=25;
+    }
+    if(recvd == 'r')               //r:먹이 한번 공급 및 충전(서보모터 초기세팅)
+    {
+           pos=90;
+           myservo.write(pos);
+           delay(10);
+        
+    }
+    if(recvd == 'l')              //l:먹이 2회분 충전(서보모터 왼쪽회전)
+    {
+          pos=10;
+          myservo.write(pos);
+          delay(10);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+    }
+
+    if(recvd == 'R')               //R:먹이 2회분 공급(서보모터 오른쪽회전)    
+    {
+           pos=180;
+           myservo.write(pos);
+           delay(10);
+    } 
+
+    if(recvd == 'a')                 //a: 미스팅 시스템 온
+      digitalWrite(MIST_PIN,HIGH);
+      
+    if(recvd == 'b')                 //b : 미스팅 시스템 오프
+      digitalWrite(MIST_PIN,LOW);
+
+    if(recvd == 'c')                 //c: 팬 구동
+    {
+      digitalWrite(FAN_PIN,HIGH);
+    }
+    if(recvd == 'd')            //d: 팬 멈춤
+      digitalWrite(FAN_PIN,LOW);     
+    
+    if(recvd == 'e')                 //e: 물 공급 
+    {                                //과잉 공급을 방지하기 위해 7초 뒤 자동 OFF
+      WaterMillis = millis();
+      while(1)
+      {
+      CurrentMillis = millis();
+      digitalWrite(WATER_PIN,HIGH); 
+      if(CurrentMillis-WaterMillis >=7000 || recvd == 'n')
+      {
+        recvd = 'n';
+        digitalWrite(WATER_PIN,LOW);
+        break;
+      }
+      }
+    }
+      
+    if(recvd == 'n')            //n: 물 공급 중단
+      digitalWrite(WATER_PIN,LOW);
+ }
+
+void AutoControlMode()         //자동사육모드시 명령들
+{
+  if(recvd == '[')             //저습일때 미스팅 온
+  {
+    detachInterrupt(0);
+    digitalWrite(MIST_PIN,HIGH);
+    digitalWrite(FAN_PIN,LOW);
+  }
+  if(recvd == '{')              //적정온도 적정습도일때 스팟램프 밝기 중간
+  {
+    attachInterrupt (0, zero_crosss_int, RISING);
+    dimming=55; 
+    digitalWrite(FAN_PIN,LOW);
+    digitalWrite(MIST_PIN,LOW);
+  }
+  if(recvd == ']')
+  {
+    attachInterrupt (0, zero_crosss_int, RISING);   //고온일때 스팟 저온 팬 온
+    dimming=75;
+    digitalWrite(MIST_PIN,LOW);
+    digitalWrite(FAN_PIN,HIGH);
+  }
+  if(recvd == '}')    //저온일때 스팟 고온
+  {
+    attachInterrupt (0, zero_crosss_int, RISING);
+    dimming=25;
+  }
+}
+void loop()
+{
+  UserControlMode();
+  AutoControlMode();  
+}
+  
